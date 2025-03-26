@@ -114,9 +114,9 @@ jobs:
         run: ./scripts/feeds update -a && ./scripts/feeds install -a
 
       - name: 开启 SSH 服务 (Start SSH session)
-        uses: lhotari/action-upterm@v1
+        uses: mxschmitt/action-tmate@v3
         with:
-          wait-timeout-minutes: 20
+          limit-access-to-actor: true
 
       - name: 上传配置备份 (Upload config before build)
         uses: actions/upload-artifact@v4
