@@ -52,6 +52,10 @@ jobs:
         working-directory: ImmortalWrt
         run: ./scripts/feeds update -a && ./scripts/feeds install -a
 
+      - name: 清理之前的构建 (Clean previous builds)
+        working-directory: ImmortalWrt
+        run: make clean
+        
       - name: 上传配置备份 (Upload config before build)
         uses: actions/upload-artifact@v4
         with:
