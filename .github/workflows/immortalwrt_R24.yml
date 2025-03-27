@@ -16,28 +16,34 @@ env:
 
 jobs:
   build:
-    runs-on: Ubuntu-22.04
+    runs-on: ubuntu-22.04
     if: github.event.repository.owner.id == github.event.sender.id
 
     name: 构建固件 - ${{matrix.target}}
     strategy:
       fail-fast: false
       matrix:
-        target: [immortalwrt-r24]
+        target: [immortalwrt_r24]
 
     steps:
       - name: 🧾 拉取代码
-        uses: actions/checkout@main
+        uses: actions/checkout@v3
 
-      - name: 🧱 初始化编译环境
+      - name: 🧱 初始化编译环境（清理空间 + 安装依赖）
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          sudo -E apt-get -qq update
-          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev rename
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
+          echo "🧹 清理预装包释放空间..."
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+                      /opt/hostedtoolcache /usr/lib/jvm \
+                      "$AGENT_TOOLSDIRECTORY" /usr/local/share/boost
+          sudo apt-get purge -y "mono*" "php*" || true
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          echo "📦 安装编译依赖..."
+          sudo -E apt-get update
+          sudo -E apt-get install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev rename
           sudo timedatectl set-timezone "$TZ"
 
       - name: 📅 获取当前时间
@@ -95,8 +101,8 @@ jobs:
       - name: 🧩 编译固件
         working-directory: ./openwrt
         run: |
-          echo -e "$(($(nproc)+1)) 线程进行编译"
-          make -j$(($(nproc)+1)) || make -j1 V=s
+          echo -e "$(nproc) 核心线程进行编译"
+          make -j$(nproc) || make -j1 V=s
 
       - name: 📂 整理固件文件
         id: organize
@@ -109,7 +115,7 @@ jobs:
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
 
       - name: ☁️ 上传固件
-        uses: actions/upload-artifact@main
+        uses: actions/upload-artifact@v3
         if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
           name: ${{ env.date3 }} _${{matrix.target}}
@@ -125,7 +131,7 @@ jobs:
           echo "status=success" >> $GITHUB_OUTPUT
 
       - name: 🚀 上传到 Release
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v1
         if: steps.tag.outputs.status == 'success' && !cancelled()
         env:
           GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
@@ -135,14 +141,21 @@ jobs:
           tag_name: ${{ env.date }}_${{matrix.target}}
           body_path: release.txt
 
+      - name: 🧹 构建完成后清理空间
+        if: always()
+        run: |
+          echo "🗑 清理构建中间文件释放磁盘..."
+          rm -rf openwrt/build_dir openwrt/staging_dir openwrt/tmp
+          df -h
+
       - name: 🧹 删除旧的 Workflow 记录
-        uses: Mattraks/delete-workflow-runs@main
+        uses: Mattraks/delete-workflow-runs@v2
         with:
           retain_days: 1
           keep_minimum_runs: 0
 
       - name: 🗑 清理旧的 Release
-        uses: dev-drprasad/delete-older-releases@master
+        uses: dev-drprasad/delete-older-releases@v0.3.0
         if: env.UPLOAD_RELEASE == 'true' && !cancelled()
         with:
           keep_latest: 6
