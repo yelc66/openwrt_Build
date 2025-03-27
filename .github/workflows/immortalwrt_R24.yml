@@ -82,7 +82,6 @@ jobs:
       - name: 📋 应用配置（make defconfig）
         working-directory: ./openwrt
         run: |
-          make defconfig
           echo "📂 最终配置文件内容如下："
           head -n 20 .config
 
