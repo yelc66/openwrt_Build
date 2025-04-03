@@ -1,4 +1,4 @@
-name: immortalwrt_r2s
+name: immortalwrt_R2s
 
 on:
   repository_dispatch:
