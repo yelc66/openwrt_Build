@@ -41,19 +41,18 @@ jobs:
           sudo apt-get autoremove -y
           sudo apt-get clean
 
+          echo "📦 更新软件包列表并升级系统..."
+          sudo apt update -y
+          sudo apt full-upgrade -y
+
           echo "📦 安装编译依赖..."
-          sudo -E apt-get update
-          sudo -E apt-get install -y \
-            ack antlr3 asciidoc autoconf automake autopoint binutils bison \
-            build-essential bzip2 ccache cmake cpio curl device-tree-compiler \
-            fastjar flex gawk gettext gcc-multilib g++-multilib git gperf \
-            haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev \
-            libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev \
-            libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev \
-            libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full \
-            patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools \
-            qemu-utils rsync scons squashfs-tools subversion swig texinfo \
-            uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev rename
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
+            git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev \
+            libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz \
+            mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip libpython3-dev qemu-utils \
+            rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+          
           sudo timedatectl set-timezone "$TZ"
 
       - name: 📅 获取当前时间
@@ -111,34 +110,132 @@ jobs:
           find dl -size -1024c -exec rm -f {} \;
 
       - name: 🧩 编译固件
+        id: compile
         working-directory: ./openwrt
         run: |
           echo "$(nproc) 核心线程进行编译"
-          make -j$(nproc) || make -j1 V=s
+          if make -j$(nproc); then
+            echo "✅ 编译成功"
+            echo "compile_status=success" >> $GITHUB_OUTPUT
+          elif make -j1 V=s; then
+            echo "✅ 单线程编译成功"
+            echo "compile_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ 编译失败"
+            echo "compile_status=failed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 📋 检查编译结果
+        id: check_build
+        run: |
+          echo "🔍 检查编译产物..."
+          
+          # 检查 bin 目录结构
+          if [ -d "openwrt/bin" ]; then
+            echo "📁 bin 目录存在，列出内容："
+            find openwrt/bin -type f -name "*.bin" -o -name "*.img" -o -name "*.tar*" | head -20
+          else
+            echo "❌ bin 目录不存在"
+          fi
+          
+          # 检查编译日志
+          if [ -f "openwrt/logs/package/compile.log" ]; then
+            echo "📄 编译日志存在，最后50行："
+            tail -50 openwrt/logs/package/compile.log
+          fi
 
       - name: 📂 整理固件文件
         id: organize
-        if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+        if: always()
         run: |
           mkdir -p firmware
-          mv -f openwrt/bin/targets/*/*/{*combined*,*sysupgrade*} ./firmware/ 2>/dev/null || true
+          mkdir -p logs
+          
+          # 复制配置文件
           cp openwrt/.config ./firmware/${{ matrix.target }}.config
+          
+          # 查找并复制固件文件
+          FIRMWARE_FOUND=false
+          if [ -d "openwrt/bin/targets" ]; then
+            echo "🔍 在 targets 目录中查找固件文件..."
+            
+            # 查找常见的固件文件
+            find openwrt/bin/targets -name "*combined*" -o -name "*sysupgrade*" -o -name "*.bin" -o -name "*.img" | while read file; do
+              if [ -f "$file" ]; then
+                echo "✅ 找到固件文件: $file"
+                cp "$file" ./firmware/
+                FIRMWARE_FOUND=true
+              fi
+            done
+            
+            # 如果没有找到固件，列出所有文件
+            if [ "$FIRMWARE_FOUND" = false ]; then
+              echo "❌ 未找到固件文件，列出 targets 目录内容："
+              find openwrt/bin/targets -type f | head -20
+            fi
+          fi
+          
+          # 收集编译日志
+          if [ -d "openwrt/logs" ]; then
+            echo "📋 复制编译日志..."
+            cp -r openwrt/logs/* ./logs/ 2>/dev/null || true
+          fi
+          
+          # 创建构建报告
+          cat > ./firmware/build_report.txt << EOF
+          LibWRT AX6600 构建报告
+          ====================
+          构建时间: ${{ env.date2 }}
+          编译状态: ${{ steps.compile.outputs.compile_status }}
+          目标设备: ${{ matrix.target }}
+          
+          文件列表:
+          EOF
+          
+          ls -la ./firmware/ >> ./firmware/build_report.txt
+          
+          if [ -d "openwrt/bin/targets" ]; then
+            echo "" >> ./firmware/build_report.txt
+            echo "Targets 目录内容:" >> ./firmware/build_report.txt
+            find openwrt/bin/targets -type f >> ./firmware/build_report.txt
+          fi
+          
           echo "FIRMWARE=$PWD/firmware" >> $GITHUB_ENV
+          echo "status=success" >> $GITHUB_OUTPUT
 
-      - name: ☁️ 上传固件
+      - name: ☁️ 上传构建产物
         uses: actions/upload-artifact@v4
         if: steps.organize.outputs.status == 'success' && !cancelled()
         with:
-          name: ${{ env.date3 }} _${{ matrix.target }}
-          path: ${{ env.FIRMWARE }}
+          name: ${{ env.date3 }}_${{ matrix.target }}_build
+          path: |
+            ${{ env.FIRMWARE }}
+            logs
 
       - name: 🏷 生成发布标签
         id: tag
         if: env.UPLOAD_RELEASE == 'true' && !cancelled()
         run: |
-          echo "OpenWrt firmware for ${{ matrix.target }}" > release.txt
-          echo "Build date: ${{ env.date2 }}"          >> release.txt
-          echo "status=success"                        >> $GITHUB_OUTPUT
+          # 检查是否有实际的固件文件
+          FIRMWARE_COUNT=$(find firmware -name "*.bin" -o -name "*.img" -o -name "*sysupgrade*" -o -name "*combined*" | wc -l)
+          
+          if [ "$FIRMWARE_COUNT" -gt 0 ]; then
+            echo "OpenWrt firmware for ${{ matrix.target }}" > release.txt
+            echo "编译状态: ✅ 成功" >> release.txt
+            echo "固件文件数量: $FIRMWARE_COUNT" >> release.txt
+          else
+            echo "OpenWrt build attempt for ${{ matrix.target }}" > release.txt
+            echo "编译状态: ⚠️ 完成但未生成固件文件" >> release.txt
+            echo "请检查构建日志和配置文件" >> release.txt
+          fi
+          
+          echo "构建日期: ${{ env.date2 }}" >> release.txt
+          echo "编译状态: ${{ steps.compile.outputs.compile_status }}" >> release.txt
+          echo "" >> release.txt
+          echo "包含文件:" >> release.txt
+          ls -la firmware/ >> release.txt
+          
+          echo "status=success" >> $GITHUB_OUTPUT
 
       - name: 🚀 上传到 Release
         uses: softprops/action-gh-release@v1
@@ -147,7 +244,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.REPO_TOKEN }}
         with:
           files: "${{ env.FIRMWARE }}/*"
-          name:  ${{ env.date2 }} ${{ matrix.target }}
+          name: ${{ env.date2 }} ${{ matrix.target }} Build
           tag_name: ${{ env.date }}_${{ matrix.target }}
           body_path: release.txt
 
