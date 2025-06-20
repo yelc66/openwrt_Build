@@ -66,8 +66,8 @@ jobs:
 
       - name: 📦 克隆源代码
         env:
-          REPO_URL: https://github.com/immortalwrt/immortalwrt
-          REPO_BRANCH: openwrt-24.10
+          REPO_URL: https://github.com/LiBwrt-op/openwrt-6.x
+          REPO_BRANCH: k6.12-nss
         run: |
           git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
