@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ctc_25.12]
+        target: [x86, nanopi-r2s]
     
     steps:
     - name: Checkout
@@ -121,7 +121,8 @@ jobs:
         sed -i "s/%D %V, %C/openwrt $(date +'%m.%d') by kenzo/g" package/base-files/files/etc/banner
         #cp -Rf feeds/smpackage/.github/diy/.packages/files/* files
         ./scripts/feeds update -a && ./scripts/feeds install -a
-        cp -f feeds/smpackage/.github/diy/${{matrix.target}}.config .config && make defconfig
+        # Use local config file from project root instead of remote
+        make defconfig
         
     - name: Download package
       working-directory: ./openwrt
