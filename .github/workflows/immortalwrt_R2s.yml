@@ -29,11 +29,26 @@ jobs:
       - name: 🧾 拉取代码
         uses: actions/checkout@main
 
+      - name: 🧹 清理磁盘空间
+        run: |
+          echo "📊 清理前磁盘空间："
+          df -h
+
+          echo "🗑️ 删除不需要的软件和文件..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo docker image prune --all --force
+
+          echo "📊 清理后磁盘空间："
+          df -h
+
       - name: 🧱 初始化编译环境（清理空间 + 安装依赖）
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-
           echo "📦 安装编译依赖..."
           sudo -E apt-get update
           sudo -E apt-get install -y \
@@ -115,27 +130,42 @@ jobs:
           sed -i 's/CONFIG_PACKAGE_luci-app-openclash=y/# CONFIG_PACKAGE_luci-app-openclash is not set/' .config || true
           sed -i '/CONFIG_PACKAGE_luci-app-passwall_INCLUDE/d' .config || true
 
-      - name: 📋 同步配置（make oldconfig）
+          # 禁用容易导致编译失败的大型包（ruby 和 samba4）以节省磁盘空间
+          echo "🔧 禁用 ruby 和 samba4 包以避免磁盘空间问题..."
+          sed -i 's/CONFIG_PACKAGE_ruby=y/# CONFIG_PACKAGE_ruby is not set/' .config || true
+          sed -i 's/CONFIG_PACKAGE_ruby-.*=y/# &/' .config || true
+          sed -i 's/CONFIG_PACKAGE_samba4-server=y/# CONFIG_PACKAGE_samba4-server is not set/' .config || true
+          sed -i 's/CONFIG_PACKAGE_samba4-libs=y/# CONFIG_PACKAGE_samba4-libs is not set/' .config || true
+          sed -i 's/CONFIG_PACKAGE_samba4.*=y/# &/' .config || true
+
+      - name: 📋 应用配置（make defconfig）
         working-directory: ./openwrt
         run: |
-          # 对比源码更新，非交互地接受默认
-          yes "" | make oldconfig
+          make defconfig
           echo "📂 最终配置文件内容如下："
           head -n 20 .config
 
       - name: 📥 下载依赖包
         working-directory: ./openwrt
         run: |
+          echo "📊 下载前磁盘空间："
+          df -h
           make download -j$(nproc)
           find dl -size -1024c -exec rm -f {} \;
+          echo "📊 下载后磁盘空间："
+          df -h
 
       - name: 🧩 编译固件
         working-directory: ./openwrt
         run: |
+          echo "📊 编译前磁盘空间："
+          df -h
           echo "🔨 开始编译固件（$(nproc) 核心线程）..."
           echo "💡 首次编译尝试（并行构建）..."
           make -j$(nproc) || {
             echo "⚠️ 并行编译失败，切换到单线程详细模式..."
+            echo "📊 当前磁盘空间："
+            df -h
             echo "📋 开始单线程编译并输出详细日志..."
             make -j1 V=s
           }
