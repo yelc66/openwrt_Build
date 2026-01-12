@@ -33,14 +33,6 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          echo "🧹 清理预装包释放空间..."
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
-                      /opt/hostedtoolcache /usr/lib/jvm \
-                      "$AGENT_TOOLSDIRECTORY" /usr/local/share/boost
-          sudo apt-get purge -y "mono*" "php*" || true
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
           echo "📦 安装编译依赖..."
           sudo -E apt-get update
           sudo -E apt-get install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison \
