@@ -71,12 +71,6 @@ jobs:
             ./scripts/feeds update -a
           }
 
-          echo "🗑️ 移除可能冲突的包..."
-          rm -rf feeds/packages/net/lucky
-          rm -rf feeds/luci/applications/luci-app-lucky
-          rm -rf feeds/packages/net/sing-box
-          rm -rf feeds/luci/applications/luci-app-openclash
-          rm -rf feeds/luci/applications/luci-app-passwall
 
           echo "📦 克隆自定义包仓库..."
           git clone --depth 1 https://github.com/gdy666/luci-app-lucky.git package/lucky || {
