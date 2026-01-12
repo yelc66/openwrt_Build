@@ -73,22 +73,20 @@ jobs:
       - name: 🔄 更新Feeds
         working-directory: ./openwrt
         run: |
-          echo "🔄 更新软件源..."
-          ./scripts/feeds update -a || {
-            echo "❌ 软件源更新失败，重试一次..."
-            sleep 5
-            ./scripts/feeds update -a
-          }
+          echo "📝 添加自定义软件源到 feeds.conf.default..."
+          echo "src-git nikki https://github.com/nikkinikki-org/OpenWrt-nikki.git;main" >> feeds.conf.default
 
-
-          echo "📦 克隆自定义包仓库..."
+          echo "📦 克隆自定义包仓库（lucky 作为本地包）..."
           git clone --depth 1 https://github.com/gdy666/luci-app-lucky.git package/lucky || {
             echo "❌ lucky 仓库克隆失败"
             exit 1
           }
-          git clone --depth 1 https://github.com/nikkinikki-org/OpenWrt-nikki.git package/nikki || {
-            echo "⚠️ nikki 仓库克隆失败，跳过该包"
-            rm -rf package/nikki
+
+          echo "🔄 更新软件源（包括新添加的 nikki feed）..."
+          ./scripts/feeds update -a || {
+            echo "❌ 软件源更新失败，重试一次..."
+            sleep 5
+            ./scripts/feeds update -a
           }
 
           echo "📦 安装软件包..."
@@ -96,6 +94,7 @@ jobs:
             echo "⚠️ 批量安装失败，尝试逐个安装核心包..."
             ./scripts/feeds install -p packages -a
             ./scripts/feeds install -p luci -a
+            ./scripts/feeds install -p nikki -a
             echo "✅ 核心包安装完成"
           }
 
