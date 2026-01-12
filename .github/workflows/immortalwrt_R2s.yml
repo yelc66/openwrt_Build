@@ -1,4 +1,4 @@
-name: immortalwrt_R2s_new
+name: immortalwrt_R2s_R25_12
 
 on:
   repository_dispatch:
@@ -67,7 +67,7 @@ jobs:
       - name: 📦 克隆源代码
         env:
           REPO_URL: https://github.com/immortalwrt/immortalwrt
-          REPO_BRANCH: openwrt-24.10
+          REPO_BRANCH: openwrt-25.12
         run: |
           git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
@@ -80,13 +80,6 @@ jobs:
             sleep 5
             ./scripts/feeds update -a
           }
-
-          echo "🗑️ 移除可能冲突的包..."
-          rm -rf feeds/packages/net/lucky
-          rm -rf feeds/luci/applications/luci-app-lucky
-          rm -rf feeds/packages/net/sing-box
-          rm -rf feeds/luci/applications/luci-app-openclash
-          rm -rf feeds/luci/applications/luci-app-passwall
 
           echo "📦 克隆自定义包仓库..."
           git clone --depth 1 https://github.com/gdy666/luci-app-lucky.git package/lucky || {
@@ -109,8 +102,8 @@ jobs:
       - name: 🛠 修改默认配置
         working-directory: ./openwrt
         run: |
-          sed -i 's/192.168.1.1/192.168.3.1/g' package/base-files/files/bin/config_generate
-          sed -i 's/ImmortalWrt/SS-Wrt/g'      package/base-files/files/bin/config_generate
+          sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
+          sed -i 's/ImmortalWrt/YE-Wrt/g'      package/base-files/files/bin/config_generate
 
       - name: ⚙️ 加载自定义配置
         run: |
@@ -123,11 +116,6 @@ jobs:
             exit 1
           fi
 
-      - name: 🔧 修复包安装冲突
-        working-directory: ./openwrt
-        run: |
-          echo "🔧 添加 --force-overwrite 标志以解决包文件冲突..."
-          sed -i 's/$(TARGET_DIR)) install/$(TARGET_DIR)) install --force-overwrite/' package/Makefile
 
       - name: 🔧 清理冲突的配置项
         working-directory: ./openwrt
