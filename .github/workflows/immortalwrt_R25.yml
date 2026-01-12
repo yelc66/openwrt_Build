@@ -133,16 +133,112 @@ jobs:
           make download -j$(nproc)
           find dl -size -1024c -exec rm -f {} \;
 
+      - name: 📊 收集编译环境信息
+        working-directory: ./openwrt
+        run: |
+          echo "=== 系统信息 ==="
+          uname -a
+          echo ""
+          echo "=== CPU 信息 ==="
+          echo "核心数: $(nproc)"
+          lscpu | grep "Model name" || echo "无法获取CPU型号"
+          echo ""
+          echo "=== 内存信息 ==="
+          free -h
+          echo ""
+          echo "=== 磁盘空间 ==="
+          df -h
+          echo ""
+
       - name: 🧩 编译固件
         working-directory: ./openwrt
         run: |
           echo "🔨 开始编译固件（$(nproc) 核心线程）..."
+          START_TIME=$(date +%s)
+
           echo "💡 首次编译尝试（并行构建）..."
-          make -j$(nproc) || {
-            echo "⚠️ 并行编译失败，切换到单线程详细模式..."
-            echo "📋 开始单线程编译并输出详细日志..."
-            make -j1 V=s
+          make -j$(nproc) 2>&1 | tee build.log || {
+            echo ""
+            echo "❌ ============================================"
+            echo "❌ 并行编译失败！开始详细分析..."
+            echo "❌ ============================================"
+            echo ""
+
+            # 提取错误信息
+            echo "🔍 提取错误摘要（最后20条错误）："
+            grep -i "error" build.log | tail -20 || echo "  未找到明确错误关键词"
+
+            echo ""
+            echo "📦 检查失败的包："
+            grep "make\[.\]: \*\*\*" build.log | tail -10 || echo "  未找到失败包信息"
+
+            echo ""
+            echo "⚠️ 切换到单线程详细模式重新编译..."
+            make -j1 V=s 2>&1 | tee build_verbose.log || {
+              echo ""
+              echo "❌ ============================================"
+              echo "❌ 编译最终失败！错误详情："
+              echo "❌ ============================================"
+
+              # 查找失败的包
+              echo ""
+              echo "📦 失败的软件包："
+              grep "make\[.\]: \*\*\*" build_verbose.log | tail -10
+
+              # 提取关键错误
+              echo ""
+              echo "🔍 关键错误信息（最后30条）："
+              grep -E "error:|ERROR:|Error 1|failed" build_verbose.log | tail -30
+
+              # 保存错误上下文
+              echo ""
+              echo "📋 详细日志尾部（最后100行）："
+              tail -100 build_verbose.log
+
+              exit 1
+            }
           }
+
+          END_TIME=$(date +%s)
+          ELAPSED=$((END_TIME - START_TIME))
+          echo ""
+          echo "✅ ============================================"
+          echo "✅ 编译成功！耗时：$((ELAPSED / 60)) 分 $((ELAPSED % 60)) 秒"
+          echo "✅ ============================================"
+
+      - name: 📤 上传编译日志（如果失败）
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-logs-${{ env.date3 }}-${{matrix.target}}
+          path: |
+            openwrt/build.log
+            openwrt/build_verbose.log
+            openwrt/.config
+          retention-days: 7
+
+      - name: 🔍 编译诊断信息
+        if: failure()
+        working-directory: ./openwrt
+        run: |
+          echo "📋 收集编译失败诊断信息..."
+          echo ""
+
+          echo "=== 当前磁盘空间 ==="
+          df -h
+          echo ""
+
+          echo "=== 最近编译的包（build_dir）==="
+          ls -lt build_dir/target-*/*/  2>/dev/null | head -20 || echo "  无法列出 build_dir"
+          echo ""
+
+          echo "=== staging_dir 大小统计 ==="
+          du -sh staging_dir/* 2>/dev/null || echo "  无法统计 staging_dir"
+          echo ""
+
+          echo "=== 检查是否有核心转储文件 ==="
+          find . -name "core" -o -name "*.core" 2>/dev/null | head -5 || echo "  未发现核心转储"
+          echo ""
 
       - name: 📂 整理固件文件
         id: organize
