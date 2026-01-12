@@ -28,7 +28,20 @@ jobs:
     steps:
       - name: 🧾 拉取代码
         uses: actions/checkout@v4
+        
+      - name: 🧹 清理磁盘空间
+        run: |
+          echo "📊 清理前磁盘空间："
+          df -h
 
+          echo "🗑️ 删除不需要的软件和文件..."
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo docker image prune --all --force
+          
       - name: 🧱 初始化编译环境（清理空间 + 安装依赖）
         env:
           DEBIAN_FRONTEND: noninteractive
