@@ -87,10 +87,6 @@ jobs:
             echo "❌ lucky 仓库克隆失败"
             exit 1
           }
-          git clone --depth 1 https://github.com/nikkinikki-org/OpenWrt-nikki.git package/nikki || {
-            echo "⚠️ nikki 仓库克隆失败，跳过该包"
-            rm -rf package/nikki
-          }
 
           echo "📦 安装软件包..."
           ./scripts/feeds install -a || {
