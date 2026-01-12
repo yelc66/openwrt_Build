@@ -122,22 +122,6 @@ jobs:
           fi
 
 
-      - name: 🔧 清理冲突的配置项
-        working-directory: ./openwrt
-        run: |
-          echo "🔧 清理配置文件中已删除包的配置项..."
-          # 禁用已删除的 openclash 和 passwall（如果它们不在 feeds 中）
-          sed -i 's/CONFIG_PACKAGE_luci-app-openclash=y/# CONFIG_PACKAGE_luci-app-openclash is not set/' .config || true
-          sed -i '/CONFIG_PACKAGE_luci-app-passwall_INCLUDE/d' .config || true
-
-          # 禁用容易导致编译失败的大型包（ruby 和 samba4）以节省磁盘空间
-          echo "🔧 禁用 ruby 和 samba4 包以避免磁盘空间问题..."
-          sed -i 's/CONFIG_PACKAGE_ruby=y/# CONFIG_PACKAGE_ruby is not set/' .config || true
-          sed -i 's/CONFIG_PACKAGE_ruby-.*=y/# &/' .config || true
-          sed -i 's/CONFIG_PACKAGE_samba4-server=y/# CONFIG_PACKAGE_samba4-server is not set/' .config || true
-          sed -i 's/CONFIG_PACKAGE_samba4-libs=y/# CONFIG_PACKAGE_samba4-libs is not set/' .config || true
-          sed -i 's/CONFIG_PACKAGE_samba4.*=y/# &/' .config || true
-
       - name: 📋 应用配置（make defconfig）
         working-directory: ./openwrt
         run: |
