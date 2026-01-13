@@ -127,12 +127,6 @@ jobs:
           echo "📂 最终配置文件内容如下："
           head -n 20 .config
 
-      - name: 📥 下载依赖包
-        working-directory: ./openwrt
-        run: |
-          make download -j$(nproc)
-          find dl -size -1024c -exec rm -f {} \;
-
       - name: 📊 收集编译环境信息
         working-directory: ./openwrt
         run: |
@@ -155,50 +149,8 @@ jobs:
         run: |
           echo "🔨 开始编译固件（$(nproc) 核心线程）..."
           START_TIME=$(date +%s)
-
           echo "💡 首次编译尝试（并行构建）..."
-          make -j$(nproc) 2>&1 | tee build.log || {
-            echo ""
-            echo "❌ ============================================"
-            echo "❌ 并行编译失败！开始详细分析..."
-            echo "❌ ============================================"
-            echo ""
-
-            # 提取错误信息
-            echo "🔍 提取错误摘要（最后20条错误）："
-            grep -i "error" build.log | tail -20 || echo "  未找到明确错误关键词"
-
-            echo ""
-            echo "📦 检查失败的包："
-            grep "make\[.\]: \*\*\*" build.log | tail -10 || echo "  未找到失败包信息"
-
-            echo ""
-            echo "⚠️ 切换到单线程详细模式重新编译..."
-            make -j1 V=s 2>&1 | tee build_verbose.log || {
-              echo ""
-              echo "❌ ============================================"
-              echo "❌ 编译最终失败！错误详情："
-              echo "❌ ============================================"
-
-              # 查找失败的包
-              echo ""
-              echo "📦 失败的软件包："
-              grep "make\[.\]: \*\*\*" build_verbose.log | tail -10
-
-              # 提取关键错误
-              echo ""
-              echo "🔍 关键错误信息（最后30条）："
-              grep -E "error:|ERROR:|Error 1|failed" build_verbose.log | tail -30
-
-              # 保存错误上下文
-              echo ""
-              echo "📋 详细日志尾部（最后100行）："
-              tail -100 build_verbose.log
-
-              exit 1
-            }
-          }
-
+          make
           END_TIME=$(date +%s)
           ELAPSED=$((END_TIME - START_TIME))
           echo ""
