@@ -147,7 +147,6 @@ jobs:
       - name: 🧩 编译固件
         working-directory: ./openwrt
         run: |
-          echo "🔨 开始编译固件（$(nproc) 核心线程）..."
           START_TIME=$(date +%s)
           echo "💡 首次编译尝试（并行构建）..."
           make
@@ -168,29 +167,6 @@ jobs:
             openwrt/build_verbose.log
             openwrt/.config
           retention-days: 7
-
-      - name: 🔍 编译诊断信息
-        if: failure()
-        working-directory: ./openwrt
-        run: |
-          echo "📋 收集编译失败诊断信息..."
-          echo ""
-
-          echo "=== 当前磁盘空间 ==="
-          df -h
-          echo ""
-
-          echo "=== 最近编译的包（build_dir）==="
-          ls -lt build_dir/target-*/*/  2>/dev/null | head -20 || echo "  无法列出 build_dir"
-          echo ""
-
-          echo "=== staging_dir 大小统计 ==="
-          du -sh staging_dir/* 2>/dev/null || echo "  无法统计 staging_dir"
-          echo ""
-
-          echo "=== 检查是否有核心转储文件 ==="
-          find . -name "core" -o -name "*.core" 2>/dev/null | head -5 || echo "  未发现核心转储"
-          echo ""
 
       - name: 📂 整理固件文件
         id: organize
