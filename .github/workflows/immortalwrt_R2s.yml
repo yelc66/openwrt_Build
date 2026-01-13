@@ -16,7 +16,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.event.repository.owner.id == github.event.sender.id
 
     name: 构建固件 - ${{ matrix.target }}
@@ -26,44 +26,25 @@ jobs:
         target: [immortalwrt_r2s]
 
     steps:
-      - name: 🧾 拉取代码
-        uses: actions/checkout@main
-
       - name: 🧹 清理磁盘空间
-        run: |
-          echo "📊 清理前磁盘空间："
-          df -h
-
-          echo "🗑️ 删除不需要的软件和文件..."
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo docker image prune --all --force
-
-          echo "📊 清理后磁盘空间："
-          df -h
+        uses: sbwml/actions@free-disk
 
       - name: 🧱 初始化编译环境（清理空间 + 安装依赖）
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           echo "📦 安装编译依赖..."
-          sudo -E apt-get update
-          sudo -E apt-get install -y \
-            ack antlr3 asciidoc autoconf automake autopoint binutils bison \
-            build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler ecj \
-            fastjar flex gawk gettext gcc-multilib g++-multilib git gnutls-dev gperf \
-            haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev libfuse-dev \
-            libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev \
-            libncurses5-dev libncurses-dev libncursesw5-dev libpython3-dev libreadline-dev \
-            libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
-            ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pip python3-ply \
-            python3-docutils python3-pyelftools python3-setuptools qemu-utils re2c rsync scons \
-            squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd \
-            zlib1g-dev zstd rename
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+          sudo -E apt -yqq install dos2unix
+          sudo -E apt -yqq install libfuse-dev
+          sudo -E apt -yqq autoremove --purge
+          sudo -E apt -yqq autoclean
+          sudo -E apt -yqq clean
+          sudo -E systemctl daemon-reload
           sudo timedatectl set-timezone "$TZ"
+
+      - name: 🧾 拉取代码
+        uses: actions/checkout@v4
 
       - name: 📅 获取当前时间
         id: date
@@ -88,7 +69,7 @@ jobs:
             echo "❌ lucky 仓库克隆失败"
             exit 1
           }
-          
+
           echo "🔄 更新软件源..."
           ./scripts/feeds update -a || {
             echo "❌ 软件源更新失败，重试一次..."
@@ -121,23 +102,12 @@ jobs:
             exit 1
           fi
 
-
       - name: 📋 应用配置（make defconfig）
         working-directory: ./openwrt
         run: |
           make defconfig
           echo "📂 最终配置文件内容如下："
           head -n 20 .config
-
-      - name: 📥 下载依赖包
-        working-directory: ./openwrt
-        run: |
-          echo "📊 下载前磁盘空间："
-          df -h
-          make download -j$(nproc)
-          find dl -size -1024c -exec rm -f {} \;
-          echo "📊 下载后磁盘空间："
-          df -h
 
       - name: 🧩 编译固件
         working-directory: ./openwrt
@@ -154,14 +124,30 @@ jobs:
             make -j1 V=s
           }
 
+      - name: 📤 上传编译日志（如果失败）
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-logs-${{ env.date3 }}-${{ matrix.target }}
+          path: |
+            openwrt/build.log
+            openwrt/build_verbose.log
+            openwrt/.config
+          retention-days: 7
+
       - name: 📂 整理固件文件
         id: organize
         if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
         run: |
           mkdir -p firmware
           mv -f openwrt/bin/targets/*/*/{*combined*,*sysupgrade*} ./firmware/ 2>/dev/null || true
-          cp openwrt/.config ./firmware/${{ matrix.target }}.config
+          if [ -f openwrt/.config ]; then
+            cp openwrt/.config ./firmware/${{ matrix.target }}.config
+          else
+            echo "⚠️ 警告：未找到 openwrt/.config 文件，跳过配置文件保存"
+          fi
           echo "FIRMWARE=$PWD/firmware" >> $GITHUB_ENV
+          echo "status=success" >> $GITHUB_OUTPUT
 
       - name: ☁️ 上传固件
         uses: actions/upload-artifact@v4
