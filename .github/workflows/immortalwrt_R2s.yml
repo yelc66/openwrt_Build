@@ -70,6 +70,11 @@ jobs:
             exit 1
           }
 
+          git clone --depth 1 https://github.com/sbwml/luci-app-openlist2.git package/openlist2 || {
+            echo "❌ openlist2 仓库克隆失败"
+            exit 1
+          }
+
           echo "🔄 更新软件源..."
           ./scripts/feeds update -a || {
             echo "❌ 软件源更新失败，重试一次..."
