@@ -61,6 +61,14 @@ jobs:
         run: |
           git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
+      - name: 💾 扩展编译磁盘空间
+        run: |
+          sudo mkdir -p -m 777 /mnt/openwrt/dl /mnt/openwrt/staging_dir /mnt/openwrt/build_dir
+          ln -sf /mnt/openwrt/dl openwrt/dl
+          ln -sf /mnt/openwrt/staging_dir openwrt/staging_dir
+          ln -sf /mnt/openwrt/build_dir openwrt/build_dir
+          df -h
+
       - name: 🔄 更新Feeds
         working-directory: ./openwrt
         run: |
@@ -79,6 +87,10 @@ jobs:
             sleep 5
             ./scripts/feeds update -a
           }
+
+          echo "🔧 替换 golang 为 1.26 版本..."
+          rm -rf feeds/packages/lang/golang
+          git clone --depth 1 https://github.com/kenzok8/golang -b 1.26 feeds/packages/lang/golang
 
           echo "📦 安装所有软件包..."
           ./scripts/feeds install -a || {
@@ -116,6 +128,12 @@ jobs:
           make defconfig
           echo "📂 最终配置文件内容如下："
           head -n 20 .config
+
+      - name: 📥 预下载编译依赖
+        working-directory: ./openwrt
+        run: |
+          make download -j$(nproc)
+          find dl -size -1024c -exec rm -f {} \;
 
       - name: 🧩 编译固件
         working-directory: ./openwrt
