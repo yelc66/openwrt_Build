@@ -37,6 +37,8 @@ jobs:
           sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
           sudo -E apt -yqq install dos2unix
           sudo -E apt -yqq install libfuse-dev
+          sudo -E apt -yqq install clang llvm
+          sudo npm install -g pnpm
           sudo -E apt -yqq autoremove --purge
           sudo -E apt -yqq autoclean
           sudo -E apt -yqq clean
@@ -78,6 +80,12 @@ jobs:
           echo "📦 克隆自定义包仓库（lucky 作为本地包）..."
           git clone --depth 1 https://github.com/gdy666/luci-app-lucky.git package/lucky || {
             echo "❌ lucky 仓库克隆失败"
+            exit 1
+          }
+
+          echo "📦 克隆 luci-app-daed (dae) 仓库..."
+          git clone --depth 1 -b kix https://github.com/QiuSimons/luci-app-daed.git package/dae || {
+            echo "❌ luci-app-daed 仓库克隆失败"
             exit 1
           }
 
