@@ -88,6 +88,9 @@ jobs:
             echo "❌ luci-app-daed 仓库克隆失败"
             exit 1
           }
+          echo "🔧 修复 daed 前端构建产物校验..."
+          perl -0pi -e 's/define Build\/Prepare\n\t\( \\/define Build\/Prepare\n\t( \\\n\t\tset -e; \\/' package/dae/daed/Makefile
+          perl -0pi -e 's/pnpm build --filter daed ;/pnpm --filter daed build ; \\\n\t\t\ttest -s apps\/web\/dist\/index.html ;/' package/dae/daed/Makefile
 
           echo "🔄 更新软件源（包括新添加的 nikki feed）..."
           ./scripts/feeds update -a || {
