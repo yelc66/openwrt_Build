@@ -83,14 +83,26 @@ jobs:
             exit 1
           }
 
-          echo "📦 克隆 luci-app-daed (dae) 仓库..."
+          echo "📦 克隆 luci-app-daed LuCI 界面..."
           git clone --depth 1 -b kix https://github.com/QiuSimons/luci-app-daed.git package/dae || {
             echo "❌ luci-app-daed 仓库克隆失败"
             exit 1
           }
-          echo "🔧 修复 daed 前端构建产物校验..."
-          perl -0pi -e 's/define Build\/Prepare\n\t\( \\/define Build\/Prepare\n\t( \\\n\t\tset -e; \\/' package/dae/daed/Makefile
-          perl -0pi -e 's/pnpm build --filter daed ;/pnpm --filter daed build ; \\\n\t\t\ttest -s apps\/web\/dist\/index.html ;/' package/dae/daed/Makefile
+
+          # QiuSimons 的 daed 包会在固件构建期间运行 pnpm 构建前端。
+          # 使用 openwrt-daede 已组装并通过 x86_64 构建测试的源码包，
+          # 避免 pnpm/lockfile 版本漂移导致 apps/web/dist 缺失。
+          echo "📦 获取经过 x86_64 验证的 daed 源码包定义..."
+          rm -rf package/dae/daed
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/kenzok8/small-package.git package/daed-upstream || {
+            echo "❌ daed 上游包仓库克隆失败"
+            exit 1
+          }
+          git -C package/daed-upstream sparse-checkout set daed
+          mv package/daed-upstream/daed package/dae/daed
+          rm -rf package/daed-upstream
+          grep -E '^PKG_(VERSION|SOURCE|HASH):=' package/dae/daed/Makefile
 
           echo "🔄 更新软件源（包括新添加的 nikki feed）..."
           ./scripts/feeds update -a || {
