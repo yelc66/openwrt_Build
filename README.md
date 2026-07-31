@@ -146,8 +146,9 @@ PKG_HASH
 
 ### 当前范围
 
-- x86：已使用预组装 `daed` 源码包定义。
-- R2S：目前仍使用 QiuSimons 原 `daed` 源码构建方式；如果出现相同的 pnpm/`apps/web/dist` 错误，应按相同策略单独修改并复测 R2S 工作流。
+- x86：已使用预组装 `daed` 源码包定义，并以完整 x86 工作流结果为最终验证。
+- R2S：已使用同一预组装 `daed` 源码包定义；`kenzok8/compile-package` 已有 `aarch64_cortex-a53` 成功构建记录，仍需以本仓库完整 R2S 工作流复测为准。
+- 两条工作流均保留 QiuSimons 的 LuCI 界面，只替换不稳定的 `daed` 后端源码构建定义。
 
 ## Debian/Ubuntu 本地编译环境
 
