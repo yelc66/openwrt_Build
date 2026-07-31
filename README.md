@@ -209,13 +209,22 @@ PKG_SOURCE
 PKG_HASH
 ```
 
-对应改动见 [PR #21](https://github.com/yelc66/openwrt_Build/pull/21)。修复是否成立仍以 x86 工作流完整通过为准。
+对应改动见 [PR #21](https://github.com/yelc66/openwrt_Build/pull/21)。2026-07-31 已通过 x86 与 R2S 两条完整固件工作流验证。
 
 ### 当前范围
 
-- x86：已使用预组装 `daed` 源码包定义，并以完整 x86 工作流结果为最终验证。
-- R2S：已使用同一预组装 `daed` 源码包定义；`kenzok8/compile-package` 已有 `aarch64_cortex-a53` 成功构建记录，仍需以本仓库完整 R2S 工作流复测为准。
+- x86：已使用预组装 `daed` 源码包定义，并通过本仓库完整 x86 固件编译。
+- R2S：已使用同一预组装 `daed` 源码包定义，并通过本仓库完整 R2S 固件编译。
 - 两条工作流均保留 QiuSimons 的 LuCI 界面，只替换不稳定的 `daed` 后端源码构建定义。
+
+### 2026-07-31 完整验证记录
+
+| 目标 | 运行 | 验证提交 | 结果 | 固件产物 |
+| --- | --- | --- | --- | --- |
+| x86_64 | [Actions #30600787315](https://github.com/yelc66/openwrt_Build/actions/runs/30600787315) | `ac3d3f58e61f` | 成功 | `07.31 _immortalwrt_r25`，约 383 MB |
+| NanoPi R2S | [Actions #30601110128](https://github.com/yelc66/openwrt_Build/actions/runs/30601110128) | `a3f0ef8d3609` | 成功 | `07.31 _immortalwrt_r2s`，约 253 MB |
+
+验证范围包括：自定义仓库检出、`daed` 包定义替换、版本/源码/哈希读取、Feeds 安装、`make defconfig`、依赖下载、完整固件编译、固件整理与 Actions Artifact 上传。
 
 ## Debian/Ubuntu 本地编译环境
 
